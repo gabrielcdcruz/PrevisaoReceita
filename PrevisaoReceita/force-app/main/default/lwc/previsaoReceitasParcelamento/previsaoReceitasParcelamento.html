@@ -1,0 +1,362 @@
+<template>
+  <div class="container">
+    <template if:true={isLoading}>
+      <lightning-spinner variant="brand" alternative-text="Ação em andamento..." size="large"></lightning-spinner>
+    </template>
+    <template if:false={isLoading}>
+      <div class={layoutClass}>
+        <div>
+          <!-- card da esquerda, lista de parcelas -->
+          <div class="card-full-height">
+            <c-scrollable-card icon-name="standard:budget">
+              <h1 slot="title">Parcelamentos</h1>
+              <!-- botoes de action -->
+              <template lwc:if={permitirEdicao}>
+                <lightning-button-group slot="actions">
+                  <lightning-button label="Recalcular Parcelas" onclick={handleReparcelar}></lightning-button>
+                  <lightning-button label="Nova parcela" onclick={handleNovaParcela}></lightning-button>
+                  <template if:false={isCollapsed}>
+                    <lightning-button label="Ocultar detalhes" onclick={toggleCollapse}
+                      variant="brand-outline"></lightning-button>
+                  </template>
+                  <template if:true={isCollapsed}>
+                    <lightning-button label="Mostrar detalhes" onclick={toggleCollapse}
+                      variant="brand-outline"></lightning-button>
+                  </template>
+                </lightning-button-group>
+              </template>
+              <template lwc:elseif={podeGerarNovaVersao}>
+                <lightning-button-group slot="actions">
+                  <lightning-button label="Gerar nova versão" onclick={handleNovaVersao}
+                    variant="brand"></lightning-button>
+                  <template if:false={isCollapsed}>
+                    <lightning-button label="Ocultar detalhes" onclick={toggleCollapse}
+                      variant="brand-outline"></lightning-button>
+                  </template>
+                  <template if:true={isCollapsed}>
+                    <lightning-button label="Mostrar detalhes" onclick={toggleCollapse}
+                      variant="brand-outline"></lightning-button>
+                  </template>
+                </lightning-button-group>
+              </template>
+
+              <lightning-record-view-form object-api-name="Previsao_Receita__c" record-id={recordId}>
+                <lightning-output-field field-name="Motivo__c" name="Motivo__c"></lightning-output-field>
+              </lightning-record-view-form>
+              <!-- tabela de parcelas -->
+              <table class="slds-table slds-table_cell-buffer slds-table_bordered"
+                aria-labelledby="element-with-table-label other-element-with-table-label">
+                <thead>
+                  <tr class="slds-line-height_reset">
+                    <template for:each={columns} for:item="col">
+                      <th key={col.tittle} scope="col">
+                        <div class="slds-truncate" title={col.tittle}>
+                          <lightning-formatted-text value={col.content}></lightning-formatted-text>
+                        </div>
+                      </th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template for:each={parcelas} for:item="item" for:index="index">
+                    <tr class={item.styledClass} key={item.Id} onclick={handleSelecionarParcela} data-index={index}
+                      style="cursor: pointer">
+                      <td class="slds-cell-edit slds-cell-error slds-cell_action-mode" role="gridcell">
+                        <div>
+                          <template lwc:if={item.isDirty}>
+                            <lightning-icon icon-name="utility:warning" variant="warning"
+                              alternative-text="Item modificado" class="slds-m-left_xx-small slds-button_icon-error"
+                              size="x-small" title="Item modificado"></lightning-icon>
+                          </template>
+                          <template lwc:else>
+                            <lightning-icon class="slds-m-left_xx-small" size="x-small"></lightning-icon>
+                          </template>
+                          <span class="slds-text-body_small slds-text-color_weak">{item.Numero_parcela__c}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <lightning-formatted-date-time value={item.Data__c}></lightning-formatted-date-time>
+                      </td>
+                      <td>
+                        <lightning-formatted-date-time
+                          value={item.Data_do_recebimento__c}></lightning-formatted-date-time>
+                      </td>
+                      <td class="slds-text-align_right">
+                        <lightning-formatted-number value={item.Valor__c}
+                          format-style="currency"></lightning-formatted-number>
+                      </td>
+                      <td class="slds-text-align_right">
+                        <lightning-formatted-number value={item.Valor_Faturado__c}
+                          format-style="currency"></lightning-formatted-number>
+                      </td>
+                      <td class="slds-text-align_right">
+                        <lightning-formatted-number value={item.Valor_da_retencao__c}
+                          format-style="currency"></lightning-formatted-number>
+                        <div class="icon-holder">
+                          <template lwc:if={item.Retencao_contratual__c}>
+                            <template lwc:if={item.Retencao_recebida__c}>
+                              <lightning-icon icon-name="utility:success" size="x-small" variant="success"
+                                alternative-text="Valor da retenção já foi recebido"
+                                title="Valor da retenção já foi recebido"></lightning-icon>
+                            </template>
+                            <template lwc:else>
+                              <lightning-icon icon-name="utility:expired" size="x-small" variant="warning"
+                                alternative-text="Valor ainda não foi recebido"
+                                title="Valor ainda não foi recebido"></lightning-icon>
+                            </template>
+                          </template>
+                        </div>
+                      </td>
+
+                      <td>
+                        <template if:true={item.Rateio_Previsao_de_Receita__r}>
+                          <lightning-accordion allow-multiple-sections-open="true">
+                            <lightning-accordion-section label="Rateio">
+                              <table>
+                                <tbody>
+                                  <template for:each={item.Rateio_Previsao_de_Receita__r} for:item="rateio"
+                                    for:index="rateioIndex">
+                                    <tr class={item.styledClass} key={rateio.Id}>
+                                      <td class="slds-text-align_right">
+                                        <lightning-formatted-number value={rateio.Valor__c}
+                                          format-style="currency"></lightning-formatted-number>
+                                      </td>
+                                      <td>{rateio.Centro_de_Custo__r.Name}</td>
+                                      <td>{rateio.Observacao__c}</td>
+                                    </tr>
+                                  </template>
+                                </tbody>
+                              </table>
+                            </lightning-accordion-section>
+                          </lightning-accordion>
+                        </template>
+                        <template if:false={item.Rateio_Previsao_de_Receita__r}>
+                          <template lwc:if={item.Centro_Custo__r}>
+                            {item.Centro_Custo__r.Name}
+                          </template>
+                        </template>
+                      </td>
+                      <td>
+                        <c-output-bool value={item.Realizado__c} size="x-small"></c-output-bool>
+                      </td>
+                      <td>
+                        <c-output-bool value={item.Recebido__c} size="x-small"></c-output-bool>
+                      </td>
+                      <td>
+                        <c-output-bool value={item.REIDI__c} size="x-small"></c-output-bool>
+                      </td>
+                      <td>
+                        <c-output-bool value={item.Retencao_contratual__c} size="x-small"></c-output-bool>
+                      </td>
+                      <td>{item.Observacao__c}</td>
+                    </tr>
+                  </template>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td></td>
+                    <td></td>
+                    <td class="slds-text-align_right">Total</td>
+                    <td class="slds-text-align_right">
+                      <lightning-formatted-number value={valorTotalCalculado}
+                        format-style="currency"></lightning-formatted-number>
+                    </td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td></td>
+                    <td></td>
+                    <td class="slds-text-align_right">Saldo</td>
+                    <td class={saldoTotalStyled}>
+                      <lightning-formatted-number value={saldoTotalCalculado}
+                        format-style="currency"></lightning-formatted-number>
+                    </td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </c-scrollable-card>
+          </div>
+        </div>
+        <!-- card da direita, manutenção da parcela -->
+        <div class={layoutItemClass}>
+          <div class="card-full-height">
+            <c-scrollable-card icon-name="standard:panel_detail">
+              <template lwc:if={parcelaSelecionada}>
+                <h1 slot="title">
+                  Parcela {parcelaSelecionada.Numero_parcela__c}
+                </h1>
+                <template lwc:if={permitirEdicao}>
+                  <template lwc:if={parcelaSelecionada.isDirty}>
+                    <lightning-button label="Desfazer alterações" slot="actions" variant="destructive"
+                      class="slds-m-right_small" onclick={handleDesfazerAlteracoes}></lightning-button>
+                  </template>
+                  <!-- botoes de ação -->
+                  <lightning-button-group slot="actions">
+                    <lightning-button label="Salvar" onclick={handleSalvarParcela}></lightning-button>
+                    <lightning-button label="Remover" onclick={handleRemoverParcela}></lightning-button>
+                    <lightning-button label="Ratear" onclick={handleRatear}></lightning-button>
+                  </lightning-button-group>
+                </template>
+
+                <div class="slds-p-around_medium">
+                  <lightning-record-edit-form object-api-name="Item_Previsao_Receita__c" padding="around-small"
+                    density="compact" class="my-item-previsao-receita-form">
+                    <lightning-messages></lightning-messages>
+                    <template lwc:if={parcelaSelecionada.deuErro}>
+                      <div class="slds-text-color_error">{parcelaSelecionada.mensagemDeErro}</div>
+                    </template>
+                    <lightning-accordion allow-multiple-sections-open active-section-name="Geral">
+                      <lightning-accordion-section label="Gerais" name="Geral">
+                        <lightning-input-field field-name="Numero_parcela__c" name="Numero_parcela__c"
+                          value={parcelaSelecionada.Numero_parcela__c} readonly="true"></lightning-input-field>
+                        <lightning-input-field field-name="Quantidade_parcela__c" name="Quantidade_parcela__c"
+                          value={parcelaSelecionada.Quantidade_parcela__c} readonly="true"></lightning-input-field>
+                        <lightning-input-field field-name="Data__c" name="Data__c" data-field-name="Data__c"
+                          value={parcelaSelecionada.Data__c} onchange={handleFormChangeValue}
+                          readonly={naoPermitirEdicao}></lightning-input-field>
+                        <lightning-input-field field-name="Data_do_recebimento_informada__c"
+                          name="Data_do_recebimento_informada__c" data-field-name="Data_do_recebimento_informada__c"
+                          value={parcelaSelecionada.Data_do_recebimento_informada__c} onchange={handleFormChangeValue}
+                          readonly={naoPermitirEdicao}></lightning-input-field>
+                        <lightning-input-field field-name="Data_do_recebimento__c" name="Data_do_recebimento__c"
+                          data-field-name="Data_do_recebimento__c" value={parcelaSelecionada.Data_do_recebimento__c}
+                          onchange={handleFormChangeValue} readonly={naoPermitirEdicao}></lightning-input-field>
+                        <lightning-input-field field-name="Realizado__c" name="Realizado__c"
+                          data-field-name="Realizado__c" value={parcelaSelecionada.Realizado__c}
+                          onchange={handleFormChangeValue} disabled={naoPermitirEdicao}
+                          readonly={naoPermitirEdicao}></lightning-input-field>
+                        <lightning-input-field field-name="Recebido__c" name="Recebido__c" data-field-name="Recebido__c"
+                          value={parcelaSelecionada.Recebido__c} onchange={handleFormChangeValue}
+                          disabled={naoPermitirEdicao} readonly={naoPermitirEdicao}></lightning-input-field>
+                        <!-- <lightning-input-field
+                          field-name="Rateio__c"
+                          data-field-name="Rateio__c"
+                          value={parcelaSelecionada.Rateio__c}
+                          onchange={handleFormChangeValue}
+                          readonly={naoPermitirEdicao}
+                          disabled={naoPermitirEdicao}
+                        ></lightning-input-field> -->
+                        <lightning-input-field field-name="Observacao__c" name="Observacao__c"
+                          data-field-name="Observacao__c" value={parcelaSelecionada.Observacao__c}
+                          onchange={handleFormChangeValue} readonly={naoPermitirEdicao}></lightning-input-field>
+                        <lightning-input-field field-name="Centro_Custo__c" name="Centro_Custo__c"
+                          data-field-name="Centro_Custo__c" value={parcelaSelecionada.Centro_Custo__c}
+                          onchange={handleFormChangeValue} readonly={naoPermitirEdicao}
+                          disabled={naoPermitirEdicao}></lightning-input-field>
+                        <lightning-input-field data-id="Valor__c" field-name="Valor__c" name="Valor__c"
+                          data-field-name="Valor__c" value={parcelaSelecionada.Valor__c}
+                          onchange={handleFormChangeValue} readonly={naoPermitirEdicao}></lightning-input-field>
+                        <lightning-input-field field-name="Valor_Faturado__c" name="Valor_Faturado__c"
+                          data-field-name="Valor_Faturado__c" value={parcelaSelecionada.Valor_Faturado__c}
+                          readonly={naoPermitirEdicao}></lightning-input-field>
+                        <template lwc:if={permitirEdicao}>
+                          <div class="slds-grid">
+                            <div class="slds-size_1-of-2">
+                              <lightning-button-group class="slds-p-around_xx-small">
+                                <lightning-button label="Total" onclick={handleSetValorTotal}></lightning-button>
+                                <lightning-button label="Saldo" onclick={handleSetValorSaldo}></lightning-button>
+                                <lightning-button label="Percentual" disabled={percentualValido}
+                                  onclick={handleSetValorPercentual}></lightning-button>
+                              </lightning-button-group>
+                            </div>
+                            <div class="slds-size_1-of-2">
+                              <lightning-input variant="label-inline" type="number" min="0" max="100" label="Percentual"
+                                value={percentual} step="any" onchange={handlePercentualChange}></lightning-input>
+                            </div>
+                          </div>
+                        </template>
+                      </lightning-accordion-section>
+                      <lightning-accordion-section label="Retenção" name="Retenção">
+                        <lightning-input-field field-name="Retencao_contratual__c" name="Retencao_contratual__c"
+                          data-field-name="Retencao_contratual__c" value={parcelaSelecionada.Retencao_contratual__c}
+                          onchange={handleFormChangeValue} readonly={naoPermitirEdicao}
+                          disabled={naoPermitirEdicao}></lightning-input-field>
+                        <lightning-input-field field-name="Percentual_de_retencao__c" name="Percentual_de_retencao__c"
+                          data-field-name="Percentual_de_retencao__c"
+                          value={parcelaSelecionada.Percentual_de_retencao__c} readonly={naoPermitirEdicao}
+                          onchange={handleFormChangeValue}></lightning-input-field>
+                        <lightning-input-field field-name="Previsao_de_recebimento_da_retencao__c"
+                          name="Previsao_de_recebimento_da_retencao__c"
+                          data-field-name="Previsao_de_recebimento_da_retencao__c"
+                          value={parcelaSelecionada.Previsao_de_recebimento_da_retencao__c} readonly={naoPermitirEdicao}
+                          onchange={handleFormChangeValue}></lightning-input-field>
+                        <lightning-input-field field-name="Valor_da_retencao__c" name="Valor_da_retencao__c"
+                          data-field-name="Valor_da_retencao__c" value={parcelaSelecionada.Valor_da_retencao__c}
+                          readonly={naoPermitirEdicao} onchange={handleFormChangeValue}></lightning-input-field>
+                        <lightning-input-field field-name="Retencao_recebida__c" name="Retencao_recebida__c"
+                          data-field-name="Retencao_recebida__c" value={parcelaSelecionada.Retencao_recebida__c}
+                          readonly={naoPermitirEdicao} disabled={naoPermitirEdicao}
+                          onchange={handleFormChangeValue}></lightning-input-field>
+                      </lightning-accordion-section>
+                      <lightning-accordion-section label="REIDI" name="REIDI">
+                        <lightning-input-field field-name="REIDI__c" name="REIDI__c" data-field-name="REIDI__c"
+                          value={parcelaSelecionada.REIDI__c} readonly={naoPermitirEdicao} disabled={naoPermitirEdicao}
+                          onchange={handleFormChangeValue}></lightning-input-field>
+                        <lightning-input-field field-name="Percentual_de_REIDI__c" name="Percentual_de_REIDI__c"
+                          data-field-name="Percentual_de_REIDI__c" value={parcelaSelecionada.Percentual_de_REIDI__c}
+                          readonly={naoPermitirEdicao} onchange={handleFormChangeValue}></lightning-input-field>
+                        <lightning-input-field field-name="Valor_da_REIDI__c" name="Valor_da_REIDI__c"
+                          data-field-name="Valor_da_REIDI__c" value={parcelaSelecionada.Valor_da_REIDI__c}
+                          readonly={naoPermitirEdicao} onchange={handleFormChangeValue}></lightning-input-field>
+                      </lightning-accordion-section>
+                      <lightning-accordion-section label="Rateios" name="Rateios">
+                        <table class="slds-table slds-table_cell-buffer slds-table_bordered"
+                          aria-labelledby="element-with-table-label other-element-with-table-label">
+                          <thead>
+                            <tr class="slds-line-height_reset">
+                              <th class="" scope="col">
+                                <div class="slds-truncate" title="Número">Nº</div>
+                              </th>
+                              <th class="" scope="col">
+                                <div class="slds-truncate" title="Valor">
+                                  Valor
+                                </div>
+                              </th>
+                              <th class="" scope="col">
+                                <div class="slds-truncate" title="Centro de Custo">
+                                  Centro de custo
+                                </div>
+                              </th>
+                              <th class="" scope="col">
+                                <div class="slds-wrap" title="Observação">
+                                  Observação
+                                </div>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <template for:each={rateiosParcelaSelecionada} for:item="item" for:index="index">
+                              <tr class={item.styledClass} key={item.Id}>
+                                <td>
+                                  <div class="slds-truncate" data-index={index}>
+                                    {index}
+                                  </div>
+                                </td>
+                                <td class="slds-text-align_right">
+                                  <lightning-formatted-number value={item.Valor__c}
+                                    format-style="currency"></lightning-formatted-number>
+                                </td>
+                                <td>{item.Centro_de_Custo__r.Name}</td>
+                                <td>{item.Observacao__c}</td>
+                              </tr>
+                            </template>
+                          </tbody>
+                        </table>
+                      </lightning-accordion-section>
+                    </lightning-accordion>
+                  </lightning-record-edit-form>
+                </div>
+              </template>
+              <template lwc:else>
+                <h2 slot="title">Selecione uma parcela para iniciar</h2>
+              </template>
+            </c-scrollable-card>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
